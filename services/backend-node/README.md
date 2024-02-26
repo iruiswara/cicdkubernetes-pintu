@@ -5,21 +5,21 @@
 
 ## How to run this service:
 
+run this command, and make sure you are already installed a makefile on your local laptops
 
-Build the code with command:
-
+to build go binary:
 ```bash
-
-npm install
-
+make -C backend-node
+```
+to run unit testing:
+```bash
+make -C backend-node test
 ```
 
-After build run this command:
-
+to run applications:
 ```bash
-node app.js
+make -C backend-node run
 ```
-
 
 and it will redirected to your browser `http://localhost:3000`
 
@@ -64,7 +64,7 @@ After build is success you can run this command to start:
 
 
 ```bash
-❯ docker run backend-go:1.0 -p 8080:8080
+❯ docker run backend-node:1.0 -p 3000:3000
 ```
 
 

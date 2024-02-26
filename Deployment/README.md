@@ -13,6 +13,11 @@ Directory Structure:
 ---
 
 ## IMPORTANT SETTINGS:
+
+for Kubernetes Agent settings:
+
++ [CI-AGENT](../ci-agent/README.md)
+  
 Create jenkins job:
 1. add new item on jenkins
 2. choose `Pipelines` for type

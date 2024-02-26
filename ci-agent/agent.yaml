@@ -10,6 +10,13 @@ spec:
       tty: true
       imagePullPolicy: IfNotPresent
       resources: {}
+    - name: unit-test
+      image: xdevbase/go-nodejs:v1.14-v12
+      command:
+      - cat
+      tty: true
+      imagePullPolicy: IfNotPresent
+      resources: {}
     - name: kaniko
       image: gcr.io/kaniko-project/executor:debug
       imagePullPolicy: IfNotPresent

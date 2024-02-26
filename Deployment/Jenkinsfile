@@ -1,0 +1,140 @@
+pipeline {
+    environment{
+        VERSION="0.0.${BUILD_NUMBER}"
+        msName = ""     
+    }
+
+    agent any
+
+    stages{
+
+        stage('Pre Deployment'){
+            steps{
+                script{
+                    if("${SERVICE_LANG}" == "go" ){
+                        return msName = "backend-go"
+                    }else if("${SERVICE_LANG}" == "node"){
+                        return msName = "backend-node"
+                    }else{
+                        return msName = "backend-go,backend-node"
+                    }
+                }
+            }
+        }
+
+        stage('Unit Testing'){
+            steps{
+                container(name: 'unit-test'){
+                    git credentialsId: 'devops-cicd-github', url: '${repoUrl}', branch: "${BRANCH_NAME}"
+                   script{
+                       if ("${SERVICE_LANG}" == "go" || "${SERVICE_LANG}" == "ALL"){
+                           sh "make -C backend-go test"
+                       }else if("${SERVICE_LANG}" == "node" || "${SERVICE_LANG}" == "ALL"){
+                           sh "make -C backend-node test"
+                       }
+                   }
+                }
+            }
+        }
+
+        stage('Build & push Images'){
+
+            parallel{
+                stage('Build go service'){
+                    agent { kubernetes { 
+                        cloud 'kubernetes' 
+                        yamlFile 'node/build.yaml' 
+                        } 
+                    }
+                    steps{
+                        container(name: 'kaniko', shell: '/busybox/sh'){
+                        git credentialsId: 'devops-cicd-github', url: '${repoUrl}', branch: "${BRANCH_NAME}"
+                            script{
+                                if("${SERVICE_LANG}" == "go" || "${SERVICE_LANG}" == "ALL"){
+                                    sh ''' #!/busybox/sh -xe
+                                    /kaniko/executor --context `pwd` --dockerfile ./services/backend-go/Dockerfile  --destination ${registryUrl}/production/${msName}:${VERSIONS} --destination ${registryUrl}/production/${msName}:latest --cleanup && mkdir -p /workspace 
+                                    '''
+                                }else {
+                                    echo "${SERVICE_LANG} not match in condition"
+                                    exit 1;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                stage('Build nodejs service'){
+                    steps{
+                        container(name: 'kaniko', shell: '/busybox/sh'){
+                        git credentialsId: 'devops-cicd-github', url: '${repoUrl}', branch: "${BRANCH_NAME}"
+                            script{
+                               if("${SERVICE_LANG}" == "node" || "${SERVICE_LANG}" == "ALL") {
+                                    sh ''' #!/busybox/sh -xe
+                                    /kaniko/executor --context `pwd` --dockerfile ./services/backend-node/Dockerfile --destination ${registryUrl}/production/${msName}:${VERSIONS} --destination ${registryUrl}/production/${msName}:latest --cleanup && mkdir -p /workspace 
+                                    '''
+                                }else{
+                                    echo "${SERVICE_LANG} not match in condition"
+                                    exit 1;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                
+            }
+        }
+
+        stage('Deployment'){
+            environment{
+                MS_NAME = "${msName}"
+            }
+            steps{
+               container('helm'){
+                script{
+                    if("${SERVIICE_LANG}" == "ALL"){
+                        def serviceList = SERVICE_NAMES.split(',')
+                        def msNameGo = serviceList[0].trim()
+                        def msNameNode = serviceList[1].trim()
+
+                    echo "Deploying Service Name (Go): ${msNameGo}"
+                    sh"""
+                       helm upgrade ${msNameGo} ${deployDir} \
+                       --set-string image.repository=${registryUrl}/production/${msName},image.tag=${VERSION},ingress.className=${ingressClass} \
+                       -f ./${deployDir}/values.yaml --debug --install --namespace ${NS}
+                    """
+
+                    echo "Service Name (Node): ${msNameNode}"
+                    sh"""
+                       helm upgrade ${msNameNode} ${deployDir} \
+                       --set-string image.repository=${registryUrl}/production/${msName},image.tag=${VERSION},ingress.className=${ingressClass} \
+                       -f ./${deployDir}/values.yaml --debug --install --namespace ${NS}
+                    """
+
+                    }else{
+                    sh"""
+                       helm upgrade ${msName} ${deployDir} \
+                       --set-string image.repository=${registryUrl}/production/${msName},image.tag=${VERSION},ingress.className=${ingressClass} \
+                       -f ./${deployDir}/values.yaml --debug --install --namespace ${NS}
+                    """
+                      }
+                    }
+                }
+            }
+            post{
+                failure{
+                    
+                    slackSend channel: '#deployment-channel', color: '#db833a', message: "Failed to start deployment: ${JOB_NAME}", teamDomain: 'company-channel', tokenCredentialId: 'jenkins-deployment-bot'
+                }
+                success{
+                    
+                    slackSend channel: '#deployment-channel', color: '#db833a', message: "Deployment Finish for ${JOB_NAME} \nEnvironment: ${deployEnv}", teamDomain: 'company-channel', tokenCredentialId: 'jenkins-deployment-bot'
+                }
+            }
+        }
+        
+
+
+        // end of main curly branches, do not delete it!
+    }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "simple-node-api",
+  "version": "1.0.0",
+  "description": "A simple Node.js API",
+  "main": "app.js",
+  "dependencies": {
+    "express": "^4.17.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

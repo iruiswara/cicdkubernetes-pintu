@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: jenkins
+  containers:  # list of containers that you want present for your build, you can define a default container in the Jenkinsfile
+    - name: helm
+      image: alpine/helm:3.1.2
+      command:
+      - cat
+      tty: true
+      imagePullPolicy: IfNotPresent
+      resources: {}
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:debug
+      imagePullPolicy: IfNotPresent
+      resources: {}
+      command:
+      - /busybox/cat
+      tty: true
+      volumeMounts:
+        - name: jenkins-docker-cfg
+          mountPath: /kaniko/.docker
+  volumes:
+  - name: jenkins-docker-cfg
+    projected:
+      sources:
+      - secret:
+          name: harborauth
+          items:
+            - key: .dockerconfigjson
+              path: config.json
+  - name: docker-cfg
+    projected:
+      sources:
+      - secret:
+          name: harborauth
+          items:
+            - key: .dockerconfigjson
+              path: config.json

@@ -4,7 +4,13 @@ pipeline {
         msName = ""     
     }
 
-    agent any
+    agent{
+        kubernetes{
+            cloud 'kubernetes'
+            idleMinutes 2
+            yamlFile '../ci-agent/agent.yaml'
+        }
+    }
 
     stages{
 
